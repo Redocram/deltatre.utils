@@ -20,13 +20,61 @@ namespace Deltatre.Utils.Tests.Timers
     [Test]
     public void Timer_Constructor_Throws_When_DueTime_Is_Less_Than_Zero()
     {
-      Assert.Throws<ArgumentOutOfRangeException>(() => new TimerAsync(_ => Task.FromResult(true), TimeSpan.FromMilliseconds(-1), TimeSpan.Zero));
+      Assert.Throws<ArgumentOutOfRangeException>(
+        () => new TimerAsync(
+          _ => Task.FromResult(true),
+          TimeSpan.FromMilliseconds(-6),
+          TimeSpan.FromSeconds(10)));
     }
 
     [Test]
     public void Timer_Constructor_Throws_When_Period_Is_Less_Than_Zero()
     {
-      Assert.Throws<ArgumentOutOfRangeException>(() => new TimerAsync(_ => Task.FromResult(true), TimeSpan.Zero, TimeSpan.FromMilliseconds(-1)));
+      Assert.Throws<ArgumentOutOfRangeException>(
+        () => new TimerAsync(
+          _ => Task.FromResult(true),
+          TimeSpan.FromSeconds(10),
+          TimeSpan.FromMilliseconds(-3)));
+    }
+
+    [Test]
+    public void Timer_Constructor_Allows_To_Pass_DueTime_Zero()
+    {
+      Assert.DoesNotThrow(
+        () => new TimerAsync(
+          _ => Task.FromResult(true),
+          TimeSpan.Zero,
+          TimeSpan.FromSeconds(10)));
+    }
+
+    [Test]
+    public void Timer_Constructor_Allows_To_Pass_Period_Zero()
+    {
+      Assert.DoesNotThrow(
+        () => new TimerAsync(
+          _ => Task.FromResult(true),
+          TimeSpan.FromSeconds(5),
+          TimeSpan.Zero));
+    }
+
+    [Test]
+    public void Timer_Constructor_Allows_To_Pass_Infinite_DueTime()
+    {
+      Assert.DoesNotThrow(
+        () => new TimerAsync(
+          _ => Task.FromResult(true),
+          Timeout.InfiniteTimeSpan,
+          TimeSpan.FromSeconds(10)));
+    }
+
+    [Test]
+    public void Timer_Constructor_Allows_To_Pass_Infinite_Period()
+    {
+      Assert.DoesNotThrow(
+        () => new TimerAsync(
+          _ => Task.FromResult(true),
+          TimeSpan.FromSeconds(5),
+          Timeout.InfiniteTimeSpan));
     }
 
     [Test]
