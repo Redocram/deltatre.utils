@@ -6,174 +6,177 @@ using System.Threading.Tasks;
 namespace Deltatre.Utils.Timers
 {
   /// <summary>
-  /// Async friendly Timer implementation.
-  /// Provides a mechanism for executing an async method on
-  /// a thread pool thread at specified intervals.
-  ///
+  /// Provides a mechanism to schedule the recurrent execution of a background workload (supporting cancellation) on a thread pool thread. The schedulation can be stopped later, when the background workload isn't useful anymore. It is possible to start and stop the timer freely as many times as you want.
+  /// This class is thread safe.
   /// This class cannot be inherited.
   /// </summary>
   public sealed class TimerAsync : IDisposable
   {
-    private readonly Func<CancellationToken, Task> _scheduledAction;
-    private readonly TimeSpan _dueTime;
-    private readonly TimeSpan _period;
-    private CancellationTokenSource _cancellationSource;
-    private Task _scheduledTask;
-    private readonly SemaphoreSlim _semaphore;
-    private bool _disposed;
-    private readonly bool _canStartNextActionBeforePreviousIsCompleted;
+    private readonly Func<CancellationToken, Task> scheduledAction;
+    private readonly TimeSpan dueTime;
+    private readonly TimeSpan period;
+    private readonly bool canStartNextActionBeforePreviousIsCompleted;
+    private readonly SemaphoreSlim semaphore; // provides a way to syncronize access to isRunning private state
+    private CancellationTokenSource cancellationTokenSource;
+    private Task backgroundWorkloadTask;
+    private bool isDisposed;
+    private bool isRunning;
 
     /// <summary>
-    /// Occurs when an error is raised in the scheduled action
+    /// This event is raised when an error occurs during the execution of the scheduled background workload. Subscribe this event if you want to perform logging or do something else when an error occurs.
     /// </summary>
     public event EventHandler<Exception> OnError;
 
     /// <summary>
-    /// Gets the running status of the TimerAsync instance. 
+    /// Initializes a new instance of the <see cref="TimerAsync" /> class
     /// </summary>
-    public bool IsRunning { get; private set; }
-
-    /// <summary>
-    /// Initializes a new instance of the TimerAsync. 
-    /// </summary>
-    /// <param name="scheduledAction">A delegate representing a method to be executed.</param>
-    /// <param name="dueTime">The amount of time to delay befoe scheduledAction is invoked for the first time.</param>
-    /// <param name="period">The time interval between invocations of the scheduledAction.</param>
-    /// <param name="canStartNextActionBeforePreviousIsCompleted">
-    ///   Whether or not the interval starts at the end of the previous scheduled action or at precise points in time. 
-    /// </param>
-    public TimerAsync(Func<CancellationToken, Task> scheduledAction, TimeSpan dueTime, TimeSpan period, bool canStartNextActionBeforePreviousIsCompleted = false)
+    /// <param name="scheduledAction">The background workload to be scheduled</param>
+    /// <param name="dueTime">The delay befoe <paramref name="scheduledAction" /> is invoked for the first time. Pass the value <see cref="Timeout.InfiniteTimeSpan" /> if you never want to execute <paramref name="scheduledAction" /></param>
+    /// <param name="period">The delay between two consecutive invocations of <paramref name="scheduledAction" />. Pass the value <see cref="Timeout.InfiniteTimeSpan" /> if want to execute <paramref name="scheduledAction" /> once</param>
+    /// <param name="canStartNextActionBeforePreviousIsCompleted"> Whether or not waiting for the completion of <paramref name="scheduledAction" /> before starting the delay represented by <paramref name="period" /></param>
+    /// <exception cref="ArgumentNullException">Throws <see cref="ArgumentNullException"/> when parameter <paramref name="scheduledAction"/> is null</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Throws <see cref="ArgumentOutOfRangeException"/> when either parameter <paramref name="dueTime"/> or <paramref name="period"/> is less than <see cref="TimeSpan.Zero"/> and other than <see cref="Timeout.InfiniteTimeSpan" /></exception>
+    public TimerAsync(
+      Func<CancellationToken, Task> scheduledAction,
+      TimeSpan dueTime,
+      TimeSpan period,
+      bool canStartNextActionBeforePreviousIsCompleted = false)
     {
-      _scheduledAction = scheduledAction ?? throw new ArgumentNullException(nameof(scheduledAction));
+      if (!isValidDelay(dueTime))
+        throw new ArgumentOutOfRangeException(
+          nameof(dueTime),
+          $"Parameter {nameof(dueTime)} must be a non negative delay or a delay of -1 milliseconds");
 
-      if (dueTime < TimeSpan.Zero)
-        throw new ArgumentOutOfRangeException(nameof(dueTime), "due time must be equal or greater than zero");
-      _dueTime = dueTime;
+      if (!isValidDelay(period))
+        throw new ArgumentOutOfRangeException(
+          nameof(period),
+          $"Parameter {nameof(period)} must be a non negative delay or a delay of -1 milliseconds");
 
-      if (period < TimeSpan.Zero)
-        throw new ArgumentOutOfRangeException(nameof(period), "period must be equal or greater than zero");
-      _period = period;
+      this.scheduledAction = scheduledAction ?? throw new ArgumentNullException(nameof(scheduledAction));
+      this.dueTime = dueTime;
+      this.period = period;
+      this.canStartNextActionBeforePreviousIsCompleted = canStartNextActionBeforePreviousIsCompleted;
+      this.semaphore = new SemaphoreSlim(1);
 
-      _canStartNextActionBeforePreviousIsCompleted = canStartNextActionBeforePreviousIsCompleted;
-
-      _semaphore = new SemaphoreSlim(1);
+      bool isValidDelay(TimeSpan delay)
+      {
+        return delay >= TimeSpan.Zero || delay == Timeout.InfiniteTimeSpan;
+      }
     }
 
     /// <summary>
-    /// Starts the TimerAsync.
+    /// Starts the timer. You can safely call this method multiple times even if the timer is already started.
     /// </summary>
+    /// <exception cref="ObjectDisposedException">Throws <see cref="ObjectDisposedException"/> if the instance on which you are calling <see cref="Start"/> has been disposed</exception>
     public void Start()
     {
-      _semaphore.Wait();
+      if (this.isDisposed)
+        throw new ObjectDisposedException(typeof(TimerAsync).Name);
+
+      this.semaphore.Wait();
 
       try
       {
-        if (_disposed)
-          throw new ObjectDisposedException(GetType().FullName);
-
-        if (IsRunning)
+        if (this.isRunning)
           return;
 
-        _cancellationSource = new CancellationTokenSource();
-        _scheduledTask = RunScheduledAction();
-        IsRunning = true;
+        this.cancellationTokenSource = new CancellationTokenSource();
+        this.isRunning = true;
+        this.backgroundWorkloadTask = this.RunBackgroundWorkload();
       }
       finally
       {
-        _semaphore.Release();
+        this.semaphore.Release();
       }
     }
 
     /// <summary>
-    /// Stops the TimerAsync.
+    /// Stops the timer. Calling this method implies cancelling the schedulation of the background workload. You can safely call this method multiple times even if the timer is already stopped.
     /// </summary>
-    /// <returns>A task that completes when the timer is stopped.</returns>
+    /// <returns>A <see cref="Task"/> representing the ongoing operation of stopping the timer</returns>
+    /// <exception cref="ObjectDisposedException">Throws <see cref="ObjectDisposedException"/> if the instance on which you are calling <see cref="Stop"/> has been disposed</exception>
     public async Task Stop()
     {
-      await _semaphore.WaitAsync().ConfigureAwait(false);
+      if (this.isDisposed)
+        throw new ObjectDisposedException(typeof(TimerAsync).Name);
+
+      await this.semaphore.WaitAsync().ConfigureAwait(false);
 
       try
       {
-        if (_disposed)
-          throw new ObjectDisposedException(GetType().FullName);
-
-        if (!IsRunning)
+        if (!this.isRunning)
           return;
 
-        _cancellationSource.Cancel();
-
-        await _scheduledTask.ConfigureAwait(false);
+        this.cancellationTokenSource.Cancel();
+        await this.backgroundWorkloadTask.ConfigureAwait(false);
       }
-      catch (OperationCanceledException) { }
+      catch (OperationCanceledException)
+      {
+        // nothing to do here: task cancellation throws OperationCanceledException by design
+      }
       finally
       {
-        IsRunning = false;
-        _semaphore.Release();
+        this.isRunning = false;
+        this.cancellationTokenSource?.Dispose();
+        this.cancellationTokenSource = null;
+        this.semaphore.Release();
       }
     }
 
-    private Task RunScheduledAction()
+    private Task RunBackgroundWorkload()
     {
       return Task.Run(async () =>
       {
         try
         {
-          await Task.Delay(_dueTime, _cancellationSource.Token).ConfigureAwait(false);
+          await Task.Delay(this.dueTime, this.cancellationTokenSource.Token).ConfigureAwait(false);
 
           while (true)
           {
-            if (_canStartNextActionBeforePreviousIsCompleted)
-#pragma warning disable 4014
-                _scheduledAction(_cancellationSource.Token);
-#pragma warning restore 4014
-              else
-              await _scheduledAction(_cancellationSource.Token).ConfigureAwait(false);
+            if (this.canStartNextActionBeforePreviousIsCompleted)
+            {
+#pragma warning disable CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
+              this.scheduledAction(this.cancellationTokenSource.Token); // fire and forget call to the scheduled action whitout waiting for it to complete
+#pragma warning restore CS4014 // Because this call is not awaited, execution of the current method continues before the call is completed
+            }
+            else
+            {
+              await this.scheduledAction(this.cancellationTokenSource.Token).ConfigureAwait(false);
+            }
 
-            await Task.Delay(_period, _cancellationSource.Token).ConfigureAwait(false);
+            await Task.Delay(this.period, this.cancellationTokenSource.Token).ConfigureAwait(false);
           }
         }
-        catch (OperationCanceledException) { }
-        catch (Exception ex)
+        catch (OperationCanceledException)
         {
+          // nothing to do here: task cancellation throws OperationCanceledException by design
+        }
+        catch (Exception exception)
+        {
+          this.isRunning = false;
+
           try
           {
-            OnError?.Invoke(this, ex);
+            this.OnError?.Invoke(this, exception);
           }
-          catch
+#pragma warning disable RCS1075 // Avoid empty catch clause that catches System.Exception.
+#pragma warning disable RECS0022 // A catch clause that catches System.Exception and has an empty body
+          catch(Exception)
+#pragma warning restore RECS0022 // A catch clause that catches System.Exception and has an empty body
+#pragma warning restore RCS1075 // Avoid empty catch clause that catches System.Exception.
           {
-              // ignored
-            }
+            // swallow any kind of error here (we know nothing about the event subscriber and it is possible that it throws an exception during execution)
+          }
         }
-        finally
-        {
-          IsRunning = false;
-        }
-      }, _cancellationSource.Token);
-    }
-
-    private void Dispose(bool disposing)
-    {
-      if (_disposed)
-        return;
-
-      // NOTE: release unmanaged resources here
-
-      if (disposing)
-      {
-        Stop().Wait();
-        _cancellationSource?.Dispose();
-        _semaphore?.Dispose();
-      }
-
-      _disposed = true;
+      }, this.cancellationTokenSource.Token);
     }
 
     /// <summary>
-    /// Releases all resources used by the current instance of TimerAsync.
+    /// Release resources
     /// </summary>
     public void Dispose()
     {
-      Dispose(true);
+      this.Dispose(true);
       GC.SuppressFinalize(this);
     }
 
@@ -182,7 +185,22 @@ namespace Deltatre.Utils.Timers
 		/// </summary>
     ~TimerAsync()
     {
-      Dispose(false);
+      this.Dispose(false);
+    }
+
+    private void Dispose(bool disposing)
+    {
+      if (this.isDisposed)
+        return;
+
+      if (disposing)
+      {
+        this.Stop().Wait();
+        this.cancellationTokenSource?.Dispose();
+        this.semaphore?.Dispose();
+      }
+
+      this.isDisposed = true;
     }
   }
 }
