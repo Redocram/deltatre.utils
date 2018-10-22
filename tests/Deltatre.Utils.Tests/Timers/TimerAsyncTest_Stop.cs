@@ -1,7 +1,10 @@
-﻿using System;
+﻿using Deltatre.Utils.Timers;
+using NUnit.Framework;
+using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Deltatre.Utils.Tests.Timers
@@ -9,26 +12,29 @@ namespace Deltatre.Utils.Tests.Timers
   public partial class TimerAsyncTest
   {
     [Test]
-    public async Task Calling_Stop_Should_Cancel_Scheduled_Action()
+    public async Task Stop_Terminates_Execution_Of_Scheduled_Background_Workload()
     {
       // ARRANGE
-      var list = new List<int>();
+      var values = new ConcurrentBag<int>();
       Func<CancellationToken, Task> action = ct =>
       {
         ct.ThrowIfCancellationRequested();
-        list.Add(1);
+        values.Add(1);
         return Task.FromResult(true);
       };
+
+
+
       var timer = new TimerAsync(action, TimeSpan.FromMilliseconds(500), TimeSpan.FromMilliseconds(500));
       timer.Start();
       await Task.Delay(1200);
-      var count = list.Count;
+      var count = values.Count;
 
       // ACT     
       await timer.Stop();
 
       // ASSERT
-      Assert.LessOrEqual(list.Count, count + 1);
+      Assert.LessOrEqual(values.Count, count + 1);
     }
 
     [Test]

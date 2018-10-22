@@ -127,12 +127,5 @@ namespace Deltatre.Utils.Tests.Timers
       Assert.GreaterOrEqual(2, values.Count);
       Assert.IsTrue(values.All(value => value == 1));
     }
-
-
-
-
-
-
-    
   }
 }
