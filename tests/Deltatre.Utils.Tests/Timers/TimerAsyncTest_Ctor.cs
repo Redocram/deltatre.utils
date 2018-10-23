@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Deltatre.Utils.Timers;
@@ -89,14 +90,17 @@ namespace Deltatre.Utils.Tests.Timers
     public async Task It_Is_Possible_To_Execute_Background_Workload_Before_Previous_Execution_Completes()
     {
       // ARRANGE
-      var timeFrames = new ConcurrentBag<(DateTime startTime, DateTime endTime)>();
-
+      var iterationInfos = new ConcurrentBag<(DateTime start, DateTime end, int iterationNumber)>();
+      int counter = 0;
       Func<CancellationToken, Task> action = async _ => 
       {
+        var iterationNumber = Interlocked.Increment(ref counter);
+
         var startTime = DateTime.Now;
         await Task.Delay(500).ConfigureAwait(false);
         var endTime = DateTime.Now;
-        timeFrames.Add((startTime, endTime));
+
+        iterationInfos.Add((startTime, endTime, iterationNumber));
       };
 
       var target = new TimerAsync(
@@ -111,7 +115,17 @@ namespace Deltatre.Utils.Tests.Timers
       await target.Stop().ConfigureAwait(false);
 
       // ASSERT
-      Assert.GreaterOrEqual(timeFrames.Count, 2);
+      Assert.GreaterOrEqual(iterationInfos.Count, 2);
+
+      // check the overlap
+      var timeFrames = iterationInfos
+        .OrderBy(tf => tf.iterationNumber)
+        .Select(tf => (tf.start, tf.end))
+        .ToArray<(DateTime start, DateTime end)>();
+
+      var timeFrame1 = timeFrames[0];
+      var timeFrame2 = timeFrames[1];
+      Assert.IsTrue(timeFrame1.end > timeFrame2.start);
     }
   }
 }
