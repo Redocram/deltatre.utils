@@ -1,5 +1,5 @@
 ﻿using Deltatre.Utils.Extensions.Enumerable;
-using Deltatre.Utils.Timers;
+using Deltatre.Utils.Concurrency;
 using NUnit.Framework;
 using System;
 using System.Collections.Generic;
@@ -7,7 +7,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Deltatre.Utils.Tests.Timers
+namespace Deltatre.Utils.Tests.Concurrency
 {
   public partial class TimerAsyncTest
   {

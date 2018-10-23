@@ -4,10 +4,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Deltatre.Utils.Timers;
+using Deltatre.Utils.Concurrency;
 using NUnit.Framework;
 
-namespace Deltatre.Utils.Tests.Timers
+namespace Deltatre.Utils.Tests.Concurrency
 {
   [TestFixture]
   public partial class TimerAsyncTest

@@ -2,8 +2,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-// TODO move Timers namespace under Concurrency namespace
-namespace Deltatre.Utils.Timers
+namespace Deltatre.Utils.Concurrency
 {
   /// <summary>
   /// Provides a mechanism to schedule the recurrent execution of a background workload (supporting cancellation) on a thread pool thread. The schedulation can be stopped later, when the background workload isn't useful anymore. It is possible to start and stop the timer freely as many times as you want.

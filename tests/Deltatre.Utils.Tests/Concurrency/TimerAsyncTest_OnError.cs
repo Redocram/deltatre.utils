@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
-using Deltatre.Utils.Timers;
+using Deltatre.Utils.Concurrency;
 using Moq;
 using NUnit.Framework;
 
-namespace Deltatre.Utils.Tests.Timers
+namespace Deltatre.Utils.Tests.Concurrency
 {
   public partial class TimerAsyncTest
   {
