@@ -160,7 +160,19 @@ namespace Deltatre.Utils.Tests.Timers
       CollectionAssert.AreEqual(snapshot1, snapshot2);
     }
 
+    [Test]
+    public void Stop_Throws_ObjectDisposedException_When_Called_On_A_Disposed_Instance()
+    {
+      // ARRANGE
+      var timer = new TimerAsync(
+        _ => Task.CompletedTask,
+        TimeSpan.FromMilliseconds(500),
+        TimeSpan.FromMilliseconds(500));
 
+      // ACT & ASSERT
+      timer.Dispose();
+      Assert.ThrowsAsync<ObjectDisposedException>(timer.Stop);
+    }
 
 
 
@@ -207,26 +219,8 @@ namespace Deltatre.Utils.Tests.Timers
       Assert.IsTrue(list.All(i => i == 1));
     }
 
-    [Test]
-    public void Calling_Start_After_Dispose_Throws_ObjectDisposedException()
-    {
-      // ARRANGE
-      var timer = new TimerAsync(_ => Task.FromResult(true), TimeSpan.Zero, TimeSpan.Zero);
+    
 
-      // ACT & ASSERT
-      timer.Dispose();
-      Assert.Throws<ObjectDisposedException>(timer.Start);
-    }
-
-    [Test]
-    public void Calling_Stop_After_Dispose_Throws_ObjectDisposedException()
-    {
-      // ARRANGE
-      var timer = new TimerAsync(_ => Task.FromResult(true), TimeSpan.Zero, TimeSpan.Zero);
-
-      // ACT & ASSERT
-      timer.Dispose();
-      Assert.ThrowsAsync<ObjectDisposedException>(timer.Stop);
-    }
+    
   }
 }

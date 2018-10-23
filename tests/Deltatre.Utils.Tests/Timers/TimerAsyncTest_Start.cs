@@ -127,5 +127,19 @@ namespace Deltatre.Utils.Tests.Timers
       Assert.GreaterOrEqual(2, values.Count);
       Assert.IsTrue(values.All(value => value == 1));
     }
+
+    [Test]
+    public void Start_Throws_ObjectDisposedException_When_Called_On_A_Disposed_Instance()
+    {
+      // ARRANGE
+      var timer = new TimerAsync(
+        _ => Task.CompletedTask,
+        TimeSpan.FromMilliseconds(500),
+        TimeSpan.FromMilliseconds(500));
+
+      // ACT
+      timer.Dispose();
+      Assert.Throws<ObjectDisposedException>(timer.Start);
+    }
   }
 }
