@@ -141,5 +141,53 @@ namespace Deltatre.Utils.Tests.Timers
       timer.Dispose();
       Assert.Throws<ObjectDisposedException>(timer.Start);
     }
+
+    [Test]
+    public async Task Start_Executes_Background_Workload_Once_When_Period_Equals_Infine_Timespan()
+    {
+      // ARRANGE
+      var values = new ConcurrentBag<int>();
+      Func<CancellationToken, Task> action = _ =>
+      {
+        values.Add(1);
+        return Task.CompletedTask;
+      };
+
+      var target = new TimerAsync(
+        action,
+        TimeSpan.FromMilliseconds(500),
+        Timeout.InfiniteTimeSpan);
+
+      // ACT
+      target.Start();
+      await Task.Delay(2000).ConfigureAwait(false);
+
+      // ASSERT
+      CollectionAssert.AreEqual(new[] { 1 }, values);
+    }
+
+    [Test]
+    public async Task Start_Never_Executes_Background_Workload_When_DueTime_Equals_Infine_Timespan()
+    {
+      // ARRANGE
+      var values = new ConcurrentBag<int>();
+      Func<CancellationToken, Task> action = _ =>
+      {
+        values.Add(1);
+        return Task.CompletedTask;
+      };
+
+      var target = new TimerAsync(
+        action,
+        Timeout.InfiniteTimeSpan,
+        TimeSpan.FromMilliseconds(500));
+
+      // ACT
+      target.Start();
+      await Task.Delay(2000).ConfigureAwait(false);
+
+      // ASSERT
+      CollectionAssert.IsEmpty(values);
+    }
   }
 }
