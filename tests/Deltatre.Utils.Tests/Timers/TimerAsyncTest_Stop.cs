@@ -2,7 +2,7 @@
 using Deltatre.Utils.Timers;
 using NUnit.Framework;
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,7 +15,7 @@ namespace Deltatre.Utils.Tests.Timers
     public async Task Stop_Terminates_Execution_Of_Scheduled_Background_Workload()
     {
       // ARRANGE
-      var values = new ConcurrentBag<int>();
+      var values = new List<int>();
       Func<CancellationToken, Task> action = ct =>
       {
         ct.ThrowIfCancellationRequested();
@@ -70,7 +70,7 @@ namespace Deltatre.Utils.Tests.Timers
     public async Task Stop_Can_Be_Called_More_Than_Once_Without_Changing_Expected_Behaviour()
     {
       // ARRANGE
-      var values = new ConcurrentBag<int>();
+      var values = new List<int>();
       Func<CancellationToken, Task> action = ct =>
       {
         ct.ThrowIfCancellationRequested();
@@ -106,7 +106,7 @@ namespace Deltatre.Utils.Tests.Timers
     public async Task Stop_Is_Thread_Safe()
     {
       // ARRANGE
-      var values = new ConcurrentBag<int>();
+      var values = new List<int>();
       Func<CancellationToken, Task> action = ct =>
       {
         ct.ThrowIfCancellationRequested();
@@ -195,7 +195,7 @@ namespace Deltatre.Utils.Tests.Timers
     public async Task Stop_Can_Be_Called_Before_Start_Without_Changing_Expected_Behaviour()
     {
       // ARRANGE
-      var values = new ConcurrentBag<int>();
+      var values = new List<int>();
       Func<CancellationToken, Task> action = ct =>
       {
         ct.ThrowIfCancellationRequested();

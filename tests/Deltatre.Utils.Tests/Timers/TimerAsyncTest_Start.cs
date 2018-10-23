@@ -2,7 +2,7 @@
 using Deltatre.Utils.Timers;
 using NUnit.Framework;
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -15,7 +15,7 @@ namespace Deltatre.Utils.Tests.Timers
     public async Task Start_Schedules_Execution_Of_Background_Workload()
     {
       // ARRANGE
-      var values = new ConcurrentBag<int>();
+      var values = new List<int>();
       Func<CancellationToken, Task> action = _ =>
       {
         values.Add(1);
@@ -57,7 +57,7 @@ namespace Deltatre.Utils.Tests.Timers
     public async Task Start_Can_Be_Called_More_Than_Once_Without_Affecting_The_Execution_Of_Background_Workload()
     {
       // ARRANGE
-      var values = new ConcurrentBag<int>();
+      var values = new List<int>();
       Func<CancellationToken, Task> action = _ =>
       {
         values.Add(1);
@@ -83,7 +83,7 @@ namespace Deltatre.Utils.Tests.Timers
     public async Task Start_Is_Thread_Safe()
     {
       // ARRANGE
-      var values = new ConcurrentBag<int>();
+      var values = new List<int>();
       Func<CancellationToken, Task> action = _ =>
       {
         values.Add(1);
@@ -144,7 +144,7 @@ namespace Deltatre.Utils.Tests.Timers
     public async Task Start_Executes_Background_Workload_Once_When_Period_Equals_Infine_Timespan()
     {
       // ARRANGE
-      var values = new ConcurrentBag<int>();
+      var values = new List<int>();
       Func<CancellationToken, Task> action = _ =>
       {
         values.Add(1);
@@ -168,7 +168,7 @@ namespace Deltatre.Utils.Tests.Timers
     public async Task Start_Never_Executes_Background_Workload_When_DueTime_Equals_Infine_Timespan()
     {
       // ARRANGE
-      var values = new ConcurrentBag<int>();
+      var values = new List<int>();
       Func<CancellationToken, Task> action = _ =>
       {
         values.Add(1);
