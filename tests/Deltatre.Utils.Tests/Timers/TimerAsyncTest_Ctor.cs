@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -126,6 +127,70 @@ namespace Deltatre.Utils.Tests.Timers
       var timeFrame1 = timeFrames[0];
       var timeFrame2 = timeFrames[1];
       Assert.IsTrue(timeFrame1.end > timeFrame2.start);
+    }
+
+    [Test]
+    public async Task Amount_Of_Time_Before_First_Execution_Of_Background_Workload_Equals_DueTime()
+    {
+      // ARRANGE
+      var timeframes = new List<(DateTime start, DateTime end)>();
+      Func<CancellationToken, Task> action = async _ =>
+      {
+        var startTime = DateTime.Now;
+        await Task.Delay(500).ConfigureAwait(false);
+        var endTime = DateTime.Now;
+
+        timeframes.Add((startTime, endTime));
+      };
+
+      var target = new TimerAsync(
+        action,
+        TimeSpan.FromMilliseconds(300),
+        TimeSpan.FromMilliseconds(500));
+
+      // ACT
+      var startingTime = DateTime.Now;
+      target.Start();
+
+      await Task.Delay(350).ConfigureAwait(false);
+      await target.Stop().ConfigureAwait(false);
+
+      // ASSERT
+      Assert.GreaterOrEqual(timeframes.Count, 1);
+      var actualDueTime = timeframes[0].start - startingTime;
+      Assert.GreaterOrEqual(actualDueTime.TotalMilliseconds, 300);
+    }
+
+    [Test]
+    public async Task Amount_Of_Time_Between_Consecutives_Execution_Of_Background_Workload_Equals_Period()
+    {
+      // ARRANGE
+      var timeframes = new List<(DateTime start, DateTime end)>();
+      Func<CancellationToken, Task> action = async _ =>
+      {
+        var startTime = DateTime.Now;
+        await Task.Delay(500).ConfigureAwait(false);
+        var endTime = DateTime.Now;
+
+        timeframes.Add((startTime, endTime));
+      };
+
+      var target = new TimerAsync(
+        action,
+        TimeSpan.FromMilliseconds(300),
+        TimeSpan.FromMilliseconds(500));
+
+      // ACT
+      target.Start();
+      await Task.Delay(2100).ConfigureAwait(false); // in this amount of time background workload is executed at least 2 times
+      await target.Stop().ConfigureAwait(false);
+
+      // ASSERT
+      Assert.GreaterOrEqual(timeframes.Count, 2);
+      var timeframe1 = timeframes[0];
+      var timeframe2 = timeframes[1];
+      var actualPeriod = timeframe2.start - timeframe1.end;
+      Assert.GreaterOrEqual(actualPeriod.TotalMilliseconds, 500);
     }
   }
 }
