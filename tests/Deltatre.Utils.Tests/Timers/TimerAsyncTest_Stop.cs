@@ -20,21 +20,29 @@ namespace Deltatre.Utils.Tests.Timers
       {
         ct.ThrowIfCancellationRequested();
         values.Add(1);
-        return Task.FromResult(true);
+        return Task.CompletedTask;
       };
 
+      var target = new TimerAsync(
+        action,
+        TimeSpan.FromMilliseconds(500),
+        TimeSpan.FromMilliseconds(500));
 
+      // ACT
+      target.Start();
 
-      var timer = new TimerAsync(action, TimeSpan.FromMilliseconds(500), TimeSpan.FromMilliseconds(500));
-      timer.Start();
-      await Task.Delay(1200);
-      var count = values.Count;
+      await Task.Delay(1200).ConfigureAwait(false); // in 1200 milliseconds we are sure that action is called at least twice
 
-      // ACT     
-      await timer.Stop();
+      await target.Stop().ConfigureAwait(false);
+      var snapshot1 = values.ToArray();
+
+      await Task.Delay(1200).ConfigureAwait(false); // in 1200 milliseconds we are sure that action is called at least twice (but now the timer is stopped)
+      var snapshot2 = values.ToArray();
 
       // ASSERT
-      Assert.LessOrEqual(values.Count, count + 1);
+      Assert.GreaterOrEqual(snapshot1.Length, 2);
+      Assert.IsTrue(snapshot1.All(i => i == 1));
+      CollectionAssert.AreEqual(snapshot1, snapshot2);
     }
 
     [Test]
