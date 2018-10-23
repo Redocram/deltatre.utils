@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Runtime.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -45,7 +46,35 @@ namespace Deltatre.Utils.Tests.Timers
       mock.Verify(m => m.Log("An error occurred KABOOM !"), Times.Once());
     }
 
+    [Test]
+    public async Task OnError_Is_Not_Called_When_Timer_Is_Stopped()
+    {
+      // ARRANGE
+      var values = new List<int>();
+      Func<CancellationToken, Task> action = _ =>
+      {
+        values.Add(1);
+        return Task.CompletedTask;
+      };
 
+      var target = new TimerAsync(
+        action,
+        TimeSpan.FromMilliseconds(500),
+        TimeSpan.FromMilliseconds(500));
+
+      var mock = new Mock<ILogger>();
+      mock.Setup(m => m.Log(It.IsAny<string>())).Verifiable();
+      target.OnError += (object sender, Exception e) => mock.Object.Log($"An error occurred {e.Message}");
+
+      // ACT
+      target.Start();
+      await Task.Delay(2500).ConfigureAwait(false);
+      await target.Stop().ConfigureAwait(false);
+      await Task.Delay(2500).ConfigureAwait(false);
+
+      // ASSERT
+      mock.Verify(m => m.Log(It.IsAny<string>()), Times.Never());
+    }
 
     public interface ILogger
     {
