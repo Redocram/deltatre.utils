@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
 using Deltatre.Utils.Timers;
@@ -82,6 +83,35 @@ namespace Deltatre.Utils.Tests.Timers
           _ => Task.CompletedTask,
           TimeSpan.FromSeconds(5),
           Timeout.InfiniteTimeSpan));
+    }
+
+    [Test]
+    public async Task It_Is_Possible_To_Execute_Background_Workload_Before_Previous_Execution_Completes()
+    {
+      // ARRANGE
+      var timeFrames = new ConcurrentBag<(DateTime startTime, DateTime endTime)>();
+
+      Func<CancellationToken, Task> action = async _ => 
+      {
+        var startTime = DateTime.Now;
+        await Task.Delay(500).ConfigureAwait(false);
+        var endTime = DateTime.Now;
+        timeFrames.Add((startTime, endTime));
+      };
+
+      var target = new TimerAsync(
+        action,
+        TimeSpan.FromMilliseconds(40),
+        TimeSpan.FromMilliseconds(40),
+        canStartNextActionBeforePreviousIsCompleted: true);
+
+      // ACT
+      target.Start();
+      await Task.Delay(600).ConfigureAwait(false);
+      await target.Stop().ConfigureAwait(false);
+
+      // ASSERT
+      Assert.GreaterOrEqual(timeFrames.Count, 2);
     }
   }
 }
